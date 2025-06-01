@@ -11,6 +11,12 @@
       margin: 0;
       padding: 2rem;
       text-align: center;
+      color: #222;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    body.dark {
+      background-color: #121214;
+      color: #ddd;
     }
 
     h1 {
@@ -25,6 +31,17 @@
       color: white;
       border-radius: 5px;
       cursor: pointer;
+      margin: 0 0.3rem 1rem 0.3rem;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #2e4cbf;
+    }
+    button.dark-toggle {
+      background-color: #666;
+    }
+    button.dark-toggle:hover {
+      background-color: #444;
     }
 
     .cards {
@@ -32,7 +49,7 @@
       flex-wrap: wrap;
       justify-content: center;
       gap: 1rem;
-      margin-top: 2rem;
+      margin-top: 1rem;
     }
 
     .card {
@@ -42,6 +59,13 @@
       width: 250px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       text-align: left;
+      position: relative;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    body.dark .card {
+      background-color: #222;
+      color: #ddd;
+      box-shadow: 0 4px 8px rgba(255,255,255,0.1);
     }
 
     .card img {
@@ -55,6 +79,31 @@
       margin: 0.5rem 0 0.2rem;
     }
 
+    .edit-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: #f39c12;
+      color: white;
+      font-weight: bold;
+      border-radius: 5px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      border: none;
+    }
+    .edit-btn:hover {
+      background-color: #d47c00;
+    }
+    body.dark .edit-btn {
+      background-color: #ffa726;
+      color: #222;
+    }
+    body.dark .edit-btn:hover {
+      background-color: #cc8400;
+    }
+
     .modal {
       display: none;
       position: fixed;
@@ -63,13 +112,19 @@
       background: rgba(0, 0, 0, 0.6);
       justify-content: center;
       align-items: center;
+      z-index: 100;
     }
-
     .modal-content {
       background: white;
       padding: 1.5rem;
       border-radius: 10px;
       width: 300px;
+      transition: background-color 0.3s, color 0.3s;
+      position: relative;
+    }
+    body.dark .modal-content {
+      background: #222;
+      color: #ddd;
     }
 
     .modal-content input, .modal-content textarea {
@@ -78,12 +133,37 @@
       padding: 0.5rem;
       border-radius: 5px;
       border: 1px solid #ccc;
+      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+    body.dark .modal-content input,
+    body.dark .modal-content textarea {
+      background-color: #333;
+      color: #ddd;
+      border-color: #555;
     }
 
     .close-btn {
-      float: right;
+      position: absolute;
+      top: 8px;
+      right: 12px;
       cursor: pointer;
       font-weight: bold;
+      font-size: 1.2rem;
+      user-select: none;
+    }
+
+    .delete-btn {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 0.5rem;
+      transition: background-color 0.3s;
+    }
+    .delete-btn:hover {
+      background-color: #c0392b;
     }
   </style>
 </head>
@@ -91,22 +171,28 @@
 
   <h1>Top Personas</h1>
   <button onclick="openModal()">Añadir Tarjeta</button>
+  <button class="dark-toggle" onclick="toggleDarkMode()">Modo Oscuro</button>
 
   <div class="cards" id="cardsContainer"></div>
 
   <div class="modal" id="modal">
     <div class="modal-content">
-      <span class="close-btn" onclick="closeModal()">X</span>
-      <input type="text" id="nameInput" placeholder="Nombre">
+      <span class="close-btn" onclick="closeModal()">×</span>
+      <input type="text" id="nameInput" placeholder="Nombre" />
       <textarea id="descInput" placeholder="Descripción"></textarea>
-      <input type="url" id="imgInput" placeholder="URL de imagen">
-      <input type="number" id="topInput" placeholder="Ranking (1, 2, 3...)">
-      <button onclick="addCard()">Añadir</button>
+      <input type="url" id="imgInput" placeholder="URL de imagen" />
+      <input type="number" id="topInput" placeholder="Ranking (1, 2, 3...)" />
+      <div style="text-align: right;">
+        <button onclick="saveCard()">Guardar</button>
+        <button id="deleteBtn" class="delete-btn" onclick="deleteCard()" style="display:none;">Eliminar</button>
+      </div>
     </div>
   </div>
 
   <script>
     let cards = [];
+    let editingIndex = null;
+    let darkMode = false;
 
     // Cargar datos desde localStorage
     function loadFromStorage() {
@@ -115,6 +201,12 @@
         cards = JSON.parse(stored);
         renderCards();
       }
+      // Cargar modo oscuro
+      const storedDark = localStorage.getItem("darkMode");
+      if(storedDark === "true") {
+        darkMode = true;
+        document.body.classList.add("dark");
+      }
     }
 
     // Guardar datos en localStorage
@@ -122,41 +214,92 @@
       localStorage.setItem("topCards", JSON.stringify(cards));
     }
 
-    function openModal() {
+    // Guardar modo oscuro
+    function saveDarkMode() {
+      localStorage.setItem("darkMode", darkMode.toString());
+    }
+
+    function openModal(card = null, index = null) {
+      editingIndex = index;
       document.getElementById("modal").style.display = "flex";
+      if (card) {
+        document.getElementById("nameInput").value = card.name;
+        document.getElementById("descInput").value = card.desc;
+        document.getElementById("imgInput").value = card.img;
+        document.getElementById("topInput").value = card.top;
+        document.getElementById("deleteBtn").style.display = "inline-block";
+      } else {
+        document.getElementById("nameInput").value = "";
+        document.getElementById("descInput").value = "";
+        document.getElementById("imgInput").value = "";
+        document.getElementById("topInput").value = "";
+        document.getElementById("deleteBtn").style.display = "none";
+      }
     }
 
     function closeModal() {
       document.getElementById("modal").style.display = "none";
+      editingIndex = null;
     }
 
-    function addCard() {
-      const name = document.getElementById("nameInput").value;
-      const desc = document.getElementById("descInput").value;
-      const img = document.getElementById("imgInput").value;
+    function saveCard() {
+      const name = document.getElementById("nameInput").value.trim();
+      const desc = document.getElementById("descInput").value.trim();
+      const img = document.getElementById("imgInput").value.trim();
       const top = parseInt(document.getElementById("topInput").value);
 
-      if (!name || !desc || !img || isNaN(top)) return alert("Completa todos los campos correctamente.");
+      if (!name || !desc || !img || isNaN(top)) {
+        return alert("Completa todos los campos correctamente.");
+      }
 
-      cards.push({ name, desc, img, top });
+      if (editingIndex !== null) {
+        // Editar tarjeta existente
+        cards[editingIndex] = { name, desc, img, top };
+      } else {
+        // Añadir nueva tarjeta
+        cards.push({ name, desc, img, top });
+      }
+
       cards.sort((a, b) => a.top - b.top);
       saveToStorage();
       renderCards();
       closeModal();
     }
 
+    function deleteCard() {
+      if (editingIndex !== null) {
+        if(confirm("¿Seguro que quieres eliminar esta tarjeta?")) {
+          cards.splice(editingIndex, 1);
+          saveToStorage();
+          renderCards();
+          closeModal();
+        }
+      }
+    }
+
     function renderCards() {
       const container = document.getElementById("cardsContainer");
       container.innerHTML = "";
-      cards.forEach(card => {
+      cards.forEach((card, i) => {
         container.innerHTML += `
           <div class="card">
-            <img src="${card.img}" alt="${card.name}">
+            <img src="${card.img}" alt="${card.name}" />
             <h3>#${card.top} - ${card.name}</h3>
             <p>${card.desc}</p>
+            <button class="edit-btn" onclick="openModal(cards[${i}], ${i})">Editar</button>
           </div>
         `;
       });
+    }
+
+    function toggleDarkMode() {
+      darkMode = !darkMode;
+      if (darkMode) {
+        document.body.classList.add("dark");
+      } else {
+        document.body.classList.remove("dark");
+      }
+      saveDarkMode();
     }
 
     // Iniciar
